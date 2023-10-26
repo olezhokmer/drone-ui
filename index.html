@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Figures</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+
+        .form-container {
+            max-width: 400px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .form-button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .form-button:hover {
+            background-color: #0056b3;
+        }
+
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="300" height="300"></canvas>
+    <div class="form-container">
+        <form class="data-form" onsubmit="handleFiguresSubmit(event)">
+            <input type="number" id="figuresNum" class="form-input" name="figuresNum" placeholder="Figures number" value="10">
+            <input type="number" id="areaHeight" class="form-input" name="areaHeight" placeholder="Area height" value="300">
+            <input type="number" id="areaWidth" class="form-input" name="areaWidth" placeholder="Area width" value="300">
+            <button type="submit" class="form-button">Generate figures</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <form class="data-form" onsubmit="handleAlgorithmSubmit(event)">
+            <select id="algorithm" class="form-input">
+                <option value = "1">Genetic algorithm</option>
+                <option value = "2">Simulated annealing</option>
+            </select>
+            <button type="submit" class="form-button">Find path</button>
+        </form>
+    </div>
+    <script>
+        const domain = 'https://api.networkarc.tech/drone-api/';
+        let figures = []
+
+        let lineData;
+
+        function apiGet(url) {
+            return fetch(url, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => data);
+        }
+
+        function apiPost(url, body) {
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            };
+
+            return fetch(url, options)
+                .then(response => response.json())
+                .then(data => data)
+        }
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        clearCanvas();
+
+        function handleFiguresSubmit(event) {
+            event.preventDefault();
+            const xMax = document.getElementById('areaWidth').value;
+            const yMax = document.getElementById('areaHeight').value;
+
+            canvas.width = xMax;
+            canvas.height = yMax;
+
+            const num = document.getElementById('figuresNum').value;
+
+            if (xMax && yMax && num) {
+                apiGet(`${domain}figures?xMax=${xMax}&yMax=${yMax}&num=${num}`)
+                    .then(data => {
+                        figures = data;
+                        clearCanvas();
+                        drawFigures();
+                    });
+            }
+        }
+
+        function handleAlgorithmSubmit(event) {
+            event.preventDefault();
+            const algorithm = document.getElementById('algorithm').value;
+
+            const dto = {
+                algorithm: Number(algorithm),
+                task: {
+                    xMax: canvas.width,
+                    yMax: canvas.height,
+                    objects: figures,
+                }
+            };
+
+            if (algorithm && figures.length) {
+                apiPost(`${domain}algorithm`, dto)
+                    .then(data => {
+                        if (lineData) {
+                            clearCanvas()
+                            drawFigures()
+                        }
+                        lineData = data;
+                        drawLine(lineData.start, lineData.end);
+                    });
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#F0E68C';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawFigures() {
+            for (const figure of figures) {
+                drawFigure(figure.coordinates);
+            }
+        }
+
+
+        function drawFigure(coordinates) {
+            ctx.strokeStyle = 'black';
+            ctx.beginPath();
+            ctx.moveTo(coordinates[0].x, coordinates[0].y);
+
+            for (let i = 1; i < coordinates.length; i++) {
+                ctx.lineTo(coordinates[i].x, coordinates[i].y);
+            }
+
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(143, 143, 58, 0.6)';
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawLine(start, end) {
+            ctx.beginPath();
+            ctx.strokeStyle = 'red';
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
